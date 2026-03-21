@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>생물다양성 보드게임 - 탐험대</title>
+    <style>
+        /* 폰트 및 기본 스타일 */
+        @import url('https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Nanum+Pen+Script&display=swap');
+
+        :root {
+            --primary: #059669;
+            --primary-dark: #065f46;
+            --secondary: #4f46e5;
+            --bg-sky: #f0f9ff;
+            --white: #ffffff;
+            --slate-700: #334155;
+            --slate-400: #94a3b8;
+            --emerald-500: #10b981;
+            --amber-500: #f59e0b;
+            --blue-500: #3b82f6;
+            --red-500: #ef4444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: 'Gaegu', cursive, sans-serif;
+            background-color: var(--bg-sky);
+            color: var(--slate-700);
+            overflow: hidden;
+            height: 100vh;
+            user-select: none;
+        }
+        .font-cute { font-family: 'Nanum Pen Script', cursive; }
+
+        /* 애니메이션 */
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        .animate-float { animation: float 6s ease-in-out infinite; }
+        .animate-rotate { animation: rotate 20s linear infinite; }
+        .animate-bounce { animation: bounce 1s ease-in-out infinite; }
+
+        /* 배경 장식 */
+        .bg-decor { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+        .cloud { position: absolute; opacity: 0.3; color: #bae6fd; }
+        .sun { position: absolute; top: -50px; right: -50px; opacity: 0.2; color: #fef3c7; }
+
+        /* 레이아웃 */
+        #app { position: relative; z-index: 10; height: 100vh; display: flex; flex-direction: column; padding: 1rem; }
+        header {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(8px);
+            padding: 1rem;
+            border-radius: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            border: 2px solid white;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        }
+
+        /* 화면 전환 */
+        .screen { display: none; flex-direction: column; height: 100%; width: 100%; align-items: center; justify-content: center; }
+        .screen.active { display: flex; }
+
+        /* 시작 화면 */
+        .card-start {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 3rem;
+            box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+            max-width: 450px;
+            width: 100%;
+            text-align: center;
+            border: 4px solid #f1f5f9;
+        }
+        .btn-main {
+            width: 100%; padding: 1.25rem; border-radius: 2rem; font-size: 1.5rem; font-weight: 900;
+            border: none; cursor: pointer; transition: all 0.2s; margin-bottom: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); color: white;
+        }
+        .btn-emerald { background: var(--emerald-500); border-bottom: 6px solid #065f46; }
+        .btn-emerald:active { transform: translateY(4px); border-bottom-width: 2px; }
+        .btn-white { background: white; color: var(--blue-500); border: 4px solid #dbeafe; }
+
+        /* 보드판 */
+        .game-container { display: flex; flex-direction: column; gap: 1rem; height: 100%; overflow: hidden; }
+        @media (min-width: 1024px) { .game-container { flex-direction: row; } }
+        .board-scroll { flex-grow: 1; overflow-y: auto; padding-right: 0.5rem; }
+        .board-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; padding-bottom: 2rem; }
+        .square {
+            aspect-ratio: 1; background: white; border-radius: 1.5rem; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; padding: 0.5rem; text-align: center;
+            font-weight: 900; font-size: 0.8rem; position: relative; border: 3px solid #f1f5f9; transition: all 0.3s;
+        }
+        .square.active { border-color: var(--secondary); background: #eef2ff; }
+        .square-type-START { background: #f0fdf4; color: #166534; }
+        .square-type-GOAL { background: #fffbeb; color: #92400e; }
+        .square-type-QUIZ { background: #eff6ff; color: #1e40af; }
+        .square-type-INCREASE { background: #ecfdf5; color: #065f46; }
+        .square-type-DECREASE { background: #fef2f2; color: #991b1b; }
+        .square-type-EVENT { background: #fff7ed; color: #9a3412; }
+
+        .player-token {
+            width: 1.5rem; height: 1.5rem; border-radius: 0.5rem; border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2); position: absolute;
+            transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* 사이드바 */
+        aside { width: 100%; display: flex; flex-direction: column; gap: 1rem; }
+        @media (min-width: 1024px) { aside { width: 320px; } }
+        .card-side { background: white; padding: 1.5rem; border-radius: 2rem; border: 1px solid #f1f5f9; }
+        .progress-bar { width: 100%; height: 1rem; background: #f1f5f9; border-radius: 1rem; overflow: hidden; margin-top: 0.5rem; }
+        .progress-fill { height: 100%; background: var(--secondary); transition: width 0.5s ease-out; }
+
+        /* 주사위 */
+        .dice {
+            width: 4rem; height: 4rem; background: white; border-radius: 1rem; border: 3px solid #e2e8f0;
+            display: grid; grid-template-columns: repeat(3, 1fr); padding: 0.5rem; gap: 0.25rem;
+        }
+        .dice-dot { background: #1e293b; border-radius: 50%; width: 100%; height: 100%; }
+
+        /* 모달 */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(8px);
+            z-index: 100; display: none; align-items: center; justify-content: center; padding: 1.5rem;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content {
+            background: white; border-radius: 3rem; padding: 2.5rem; max-width: 500px; width: 100%;
+            text-align: center; border: 8px solid white; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+        }
+
+        /* 입력 폼 */
+        input {
+            width: 100%; padding: 1rem; border-radius: 1rem; border: 4px solid white;
+            background: #f8fafc; outline: none; font-family: inherit; font-size: 1.1rem; font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-decor" id="bgDecor"></div>
+
+    <div id="app">
+        <!-- 시작 화면 -->
+        <div id="screen-start" class="screen active">
+            <div class="card-start">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">🌳</div>
+                <h1 style="font-size: 3rem; font-weight: 900; margin-bottom: 0.5rem;" class="font-cute">생물다양성 탐험대</h1>
+                <p style="color: var(--slate-400); font-weight: bold; margin-bottom: 2rem;">지구의 생명을 지키는 보드게임 모험!</p>
+                
+                <div style="margin-bottom: 2rem;">
+                    <p style="font-weight: 900; margin-bottom: 1rem;">플레이어 인원</p>
+                    <div style="display: flex; justify-content: center; gap: 1rem;">
+                        <button class="player-count-btn" onclick="setPlayerCount(2)" id="pc-2" style="width: 3rem; height: 3rem; border-radius: 1rem; border: 4px solid #3b82f6; background: #eff6ff; font-weight: 900; cursor: pointer;">2</button>
+                        <button class="player-count-btn" onclick="setPlayerCount(3)" id="pc-3" style="width: 3rem; height: 3rem; border-radius: 1rem; border: 4px solid #f1f5f9; background: white; font-weight: 900; cursor: pointer;">3</button>
+                        <button class="player-count-btn" onclick="setPlayerCount(4)" id="pc-4" style="width: 3rem; height: 3rem; border-radius: 1rem; border: 4px solid #f1f5f9; background: white; font-weight: 900; cursor: pointer;">4</button>
+                    </div>
+                </div>
+
+                <button class="btn-main btn-emerald" onclick="startGame()">모험 시작!</button>
+                <button class="btn-main btn-white" onclick="showCreator()">퀴즈 만들기</button>
+            </div>
+        </div>
+
+        <!-- 게임 화면 -->
+        <div id="screen-game" class="screen">
+            <header>
+                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 1.5rem; font-weight: 900; color: var(--primary-dark);">
+                    🌳 <span class="font-cute">생물다양성 보드게임</span>
+                </div>
+                <div id="turn-info" style="font-weight: 900; color: var(--slate-400); font-size: 0.8rem;">TURN 1 / 3</div>
+                <div id="cp-color" style="width: 2.5rem; height: 2.5rem; border-radius: 1rem; border: 4px solid white; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);"></div>
+            </header>
+
+            <div class="game-container">
+                <div class="board-scroll">
+                    <div class="board-grid" id="board"></div>
+                </div>
+
+                <aside>
+                    <div class="card-side">
+                        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+                            <div id="cp-color-side" style="width: 2.5rem; height: 2.5rem; border-radius: 0.75rem;"></div>
+                            <div>
+                                <h3 id="cp-name" style="font-weight: 900; font-size: 1.1rem;">플레이어 1</h3>
+                                <span id="cp-status" style="font-size: 0.7rem; font-weight: 900; padding: 0.1rem 0.5rem; border-radius: 1rem;">안정적</span>
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 1.5rem;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 900; margin-bottom: 0.25rem;">
+                                <span>생물다양성 지수</span>
+                                <span id="cp-score">50 / 100</span>
+                            </div>
+                            <div class="progress-bar"><div class="progress-fill" id="cp-progress" style="width: 50%;"></div></div>
+                        </div>
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+                            <div class="dice" id="dice"></div>
+                            <button id="roll-btn" class="btn-main btn-emerald" onclick="rollDice()">주사위 굴리기</button>
+                            <p id="move-hint" style="font-weight: 900; color: var(--blue-500); font-size: 1.1rem; display: none;" class="animate-bounce">남은 이동: 0 칸</p>
+                        </div>
+                    </div>
+                    <div id="logs" style="background: rgba(255, 255, 255, 0.5); padding: 1rem; border-radius: 1.5rem; height: 120px; overflow: hidden; font-size: 0.85rem;"></div>
+                </aside>
+            </div>
+        </div>
+
+        <!-- 퀴즈 메이커 화면 -->
+        <div id="screen-creator" class="screen">
+            <div style="background: white; width: 100%; max-width: 600px; border-radius: 3rem; padding: 2rem; max-height: 90vh; overflow-y: auto;">
+                <h2 class="font-cute" style="font-size: 2.5rem; color: var(--blue-500); margin-bottom: 1.5rem;">퀴즈 메이커</h2>
+                <div style="background: #eff6ff; padding: 1.5rem; border-radius: 1.5rem; margin-bottom: 1.5rem;">
+                    <input type="text" id="q-input" placeholder="질문을 입력하세요" style="margin-bottom: 1rem;">
+                    <input type="text" id="opt1-input" placeholder="보기 1 (정답)" style="margin-bottom: 0.5rem;">
+                    <input type="text" id="opt2-input" placeholder="보기 2" style="margin-bottom: 1rem;">
+                    <button class="btn-main btn-emerald" onclick="addCustomQuiz()">문제 추가하기</button>
+                </div>
+                <div id="quiz-list"></div>
+                <button class="btn-main btn-white" onclick="hideCreator()">돌아가기</button>
+            </div>
+        </div>
+
+        <!-- 종료 화면 -->
+        <div id="screen-end" class="screen">
+            <div style="background: white; padding: 3rem; border-radius: 3rem; text-align: center; max-width: 500px;">
+                <div style="font-size: 4rem;">🏆</div>
+                <h2 class="font-cute" style="font-size: 4rem;">탐험 성공!</h2>
+                <div id="final-rankings" style="margin: 2rem 0;"></div>
+                <button class="btn-main btn-emerald" onclick="location.reload()">다시 하기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 모달 -->
+    <div class="modal-overlay" id="modal">
+        <div class="modal-content" id="modal-inner"></div>
+    </div>
+
+    <script>
+        // --- 데이터 ---
+        const BOARD_DATA = [
+            { id: 0, type: 'START', label: '시작' }, { id: 1, type: 'NORMAL', label: '숲속 길' },
+            { id: 2, type: 'INCREASE', label: '증가' }, { id: 3, type: 'QUIZ', label: '퀴즈' },
+            { id: 4, type: 'DECREASE', label: '감소' }, { id: 5, type: 'EVENT', label: '이벤트' },
+            { id: 6, type: 'NORMAL', label: '시냇가' }, { id: 7, type: 'INCREASE', label: '증가' },
+            { id: 8, type: 'QUIZ', label: '퀴즈' }, { id: 9, type: 'DECREASE', label: '감소' },
+            { id: 10, type: 'EVENT', label: '이벤트' }, { id: 11, type: 'NORMAL', label: '들판' },
+            { id: 12, type: 'INCREASE', label: '증가' }, { id: 13, type: 'QUIZ', label: '퀴즈' },
+            { id: 14, type: 'DECREASE', label: '감소' }, { id: 15, type: 'EVENT', label: '이벤트' },
+            { id: 16, type: 'NORMAL', label: '연못' }, { id: 17, type: 'INCREASE', label: '증가' },
+            { id: 18, type: 'QUIZ', label: '퀴즈' }, { id: 19, type: 'DECREASE', label: '감소' },
+            { id: 20, type: 'EVENT', label: '이벤트' }, { id: 21, type: 'NORMAL', label: '바닷가' },
+            { id: 22, type: 'INCREASE', label: '증가' }, { id: 23, type: 'GOAL', label: '도착' }
+        ];
+
+        const QUIZZES = [
+            { q: "생물다양성이 높은 지역의 특징은?", options: ["한 가지만 산다", "다양하게 산다"], ans: 1, hint: "조화가 중요해요!" },
+            { q: "꿀벌이 사라지면 생기는 일은?", options: ["열매가 안 맺힌다", "상관없다"], ans: 0, hint: "꿀벌은 수분을 도와요." }
+        ];
+
+        // --- 상태 ---
+        let playerCount = 2;
+        let players = [];
+        let currentPlayerIndex = 0;
+        let turnCount = 1;
+        let diceValue = 0;
+        let isRolling = false;
+        let pendingSteps = 0;
+        let customQuizzes = [...QUIZZES];
+        let logs = ["모험을 시작합니다!"];
+
+        // --- 초기화 및 화면 전환 ---
+        function setPlayerCount(count) {
+            playerCount = count;
+            document.querySelectorAll('.player-count-btn').forEach(btn => {
+                btn.style.background = 'white'; btn.style.borderColor = '#f1f5f9';
+            });
+            document.getElementById(`pc-${count}`).style.background = '#eff6ff';
+            document.getElementById(`pc-${count}`).style.borderColor = '#3b82f6';
+        }
+
+        function switchScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function startGame() {
+            players = Array.from({ length: playerCount }, (_, i) => ({
+                id: i, name: `플레이어 ${i + 1}`, color: ['#4ade80', '#60a5fa', '#f87171', '#fbbf24'][i],
+                score: 50, position: 0, isFinished: false
+            }));
+            switchScreen('screen-game');
+            renderBoard();
+            updateUI();
+        }
+
+        // --- 렌더링 ---
+        function renderBoard() {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            BOARD_DATA.forEach(sq => {
+                const div = document.createElement('div');
+                div.className = `square square-type-${sq.type}`;
+                div.id = `sq-${sq.id}`;
+                div.innerHTML = `<span>${sq.label}</span><div id="tokens-${sq.id}" style="display:flex;gap:2px;margin-top:4px;"></div>`;
+                board.appendChild(div);
+            });
+            updatePlayerPositions();
+        }
+
+        function updatePlayerPositions() {
+            document.querySelectorAll('[id^="tokens-"]').forEach(t => t.innerHTML = '');
+            players.forEach(p => {
+                const token = document.createElement('div');
+                token.className = 'player-token';
+                token.style.backgroundColor = p.color;
+                token.style.position = 'static';
+                document.getElementById(`tokens-${p.position}`).appendChild(token);
+            });
+            document.querySelectorAll('.square').forEach(s => s.classList.remove('active'));
+            document.getElementById(`sq-${players[currentPlayerIndex].position}`).classList.add('active');
+        }
+
+        function updateUI() {
+            const p = players[currentPlayerIndex];
+            document.getElementById('turn-info').innerText = `TURN ${turnCount} / 3`;
+            document.getElementById('cp-color').style.backgroundColor = p.color;
+            document.getElementById('cp-color-side').style.backgroundColor = p.color;
+            document.getElementById('cp-name').innerText = p.name;
+            document.getElementById('cp-score').innerText = `${p.score} / 100`;
+            document.getElementById('cp-progress').style.width = `${p.score}%`;
+            
+            const logsEl = document.getElementById('logs');
+            logsEl.innerHTML = logs.map(l => `<div>• ${l}</div>`).join('');
+
+            renderDice(diceValue || 1);
+            document.getElementById('roll-btn').style.display = pendingSteps > 0 ? 'none' : 'block';
+            document.getElementById('move-hint').style.display = pendingSteps > 0 ? 'block' : 'none';
+            document.getElementById('move-hint').innerText = `남은 이동: ${pendingSteps} 칸`;
+        }
+
+        function renderDice(val) {
+            const dice = document.getElementById('dice'); dice.innerHTML = '';
+            const dots = { 1:[4], 2:[0,8], 3:[0,4,8], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8] }[val] || [];
+            for(let i=0; i<9; i++) {
+                const d = document.createElement('div'); if(dots.includes(i)) d.className = 'dice-dot';
+                dice.appendChild(d);
+            }
+        }
+
+        // --- 게임 로직 ---
+        function rollDice() {
+            if (isRolling) return;
+            isRolling = true;
+            let count = 0;
+            const inv = setInterval(() => {
+                renderDice(Math.floor(Math.random()*6)+1);
+                if(++count > 10) {
+                    clearInterval(inv);
+                    diceValue = Math.floor(Math.random()*6)+1;
+                    pendingSteps = diceValue;
+                    isRolling = false;
+                    updateUI();
+                    enableSquareClick();
+                }
+            }, 80);
+        }
+
+        function enableSquareClick() {
+            document.querySelectorAll('.square').forEach(s => {
+                s.style.cursor = 'pointer';
+                s.onclick = () => {
+                    const tid = parseInt(s.id.split('-')[1]);
+                    const p = players[currentPlayerIndex];
+                    if(tid === (p.position + 1) % 24) {
+                        p.position = tid; pendingSteps--;
+                        updatePlayerPositions(); updateUI();
+                        if(pendingSteps === 0) {
+                            document.querySelectorAll('.square').forEach(sq => sq.onclick = null);
+                            handleEffect(p.position);
+                        }
+                    }
+                };
+            });
+        }
+
+        function handleEffect(pos) {
+            const type = BOARD_DATA[pos].type;
+            const p = players[currentPlayerIndex];
+            if(type === 'QUIZ') showQuiz();
+            else if(type === 'INCREASE') { p.score += 10; addLog(`${p.name} 점수 증가!`); nextTurn(); }
+            else if(type === 'DECREASE') { p.score -= 10; addLog(`${p.name} 점수 감소!`); nextTurn(); }
+            else if(type === 'GOAL') { p.isFinished = true; nextTurn(); }
+            else nextTurn();
+        }
+
+        function showQuiz() {
+            const q = customQuizzes[Math.floor(Math.random()*customQuizzes.length)];
+            const modal = document.getElementById('modal');
+            modal.classList.add('active');
+            document.getElementById('modal-inner').innerHTML = `
+                <h2 class="font-cute" style="font-size:2rem;">${q.q}</h2>
+                <div style="margin:1.5rem 0;display:flex;flex-direction:column;gap:1rem;">
+                    <button class="btn-main btn-white" onclick="checkAns(0, ${q.ans})">${q.options[0]}</button>
+                    <button class="btn-main btn-white" onclick="checkAns(1, ${q.ans})">${q.options[1]}</button>
+                </div>
+            `;
+        }
+
+        function checkAns(idx, ans) {
+            const p = players[currentPlayerIndex];
+            if(idx === ans) { p.score += 10; addLog("정답입니다!"); }
+            else { p.score -= 5; addLog("오답입니다!"); }
+            document.getElementById('modal').classList.remove('active');
+            nextTurn();
+        }
+
+        function nextTurn() {
+            if(players.every(p => p.isFinished || p.score >= 100)) { endGame(); return; }
+            currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+            if(currentPlayerIndex === 0) turnCount++;
+            if(turnCount > 3) { endGame(); return; }
+            diceValue = 0; updateUI(); updatePlayerPositions();
+        }
+
+        function endGame() {
+            switchScreen('screen-end');
+            const res = document.getElementById('final-rankings');
+            players.sort((a,b) => b.score - a.score).forEach((p, i) => {
+                res.innerHTML += `<div style="font-size:1.5rem;margin-bottom:0.5rem;">${i+1}등: ${p.name} (${p.score}점)</div>`;
+            });
+        }
+
+        function addLog(m) { logs.unshift(m); if(logs.length > 5) logs.pop(); }
+        function showCreator() { switchScreen('screen-creator'); }
+        function hideCreator() { switchScreen('screen-start'); }
+        function addCustomQuiz() {
+            const q = document.getElementById('q-input').value;
+            const o1 = document.getElementById('opt1-input').value;
+            const o2 = document.getElementById('opt2-input').value;
+            if(!q || !o1 || !o2) return;
+            customQuizzes.push({ q, options:[o1, o2], ans:0, hint:"" });
+            document.getElementById('q-input').value = '';
+            document.getElementById('quiz-list').innerHTML += `<div>• ${q}</div>`;
+        }
+
+        // 배경 애니메이션 초기화
+        window.onload = () => {
+            const bg = document.getElementById('bgDecor');
+            bg.innerHTML = `<div class="cloud animate-float" style="top:10%;left:5%;">☁️</div><div class="sun animate-rotate" style="top:5%;right:5%;font-size:3rem;">☀️</div>`;
+        };
+    </script>
+</body>
+</html>
